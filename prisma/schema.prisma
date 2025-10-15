@@ -1,0 +1,452 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Enums
+enum CompetitionStatus {
+  PLANNED
+  ONGOING
+  COMPLETED
+}
+
+enum CompetitionType {
+  ODI
+  T20
+  TEST
+}
+
+enum TeamType {
+  NATIONAL
+  DOMESTIC
+  FRANCHISE
+  CLUB
+}
+
+enum PlayerRole {
+  BATSMAN
+  BOWLER
+  ALLROUNDER
+  WICKETKEEPER
+}
+
+enum MatchType {
+  TEST
+  ODI
+  T20
+  T10
+  OTHER
+}
+
+enum MatchStatus {
+  SCHEDULED
+  LIVE
+  COMPLETED
+  ABANDONED
+  CANCELLED
+}
+
+enum TossDecision {
+  BAT
+  BOWL
+}
+
+// --- Core domain
+model Competition {
+  id           String   @id @default(uuid())
+  name         String
+  slug         String   @unique
+  type         CompetitionType
+  startDate    DateTime @map("start_date") @db.Date
+  endDate      DateTime @map("end_date") @db.Date
+  status       CompetitionStatus
+  format       Json?    // group/knockout/rules etc.
+  externalIds  Json?    @map("external_ids")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  seasons      Season[]
+  matches      Match[]
+
+  @@map("competitions")
+}
+
+model Season {
+  id             String   @id @default(uuid())
+  competitionId  String   @map("competition_id")
+  name           String
+  slug           String   @unique
+  seasonNumber   Int      @map("season_number")
+  startDate      DateTime @map("start_date") @db.Date
+  endDate        DateTime @map("end_date") @db.Date
+  status         String
+  format         Json?
+  externalIds    Json?    @map("external_ids")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  competition    Competition @relation(fields: [competitionId], references: [id])
+  matches        Match[]
+  playerContracts PlayerContract[]
+
+  @@map("seasons")
+}
+
+model Venue {
+  id          String   @id @default(uuid())
+  name        String
+  city        String
+  country     String
+  capacity    Int?
+  pitchType   String?  @map("pitch_type")
+  coordinates String?  // Store as lat,lng string or use separate lat/lng fields
+  metadata    Json?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  teams   Team[]
+  matches Match[]
+
+  @@map("venues")
+}
+
+model Team {
+  id           String   @id @default(uuid())
+  name         String
+  shortName    String   @map("short_name")
+  slug         String   @unique
+  type         TeamType
+  country      String
+  homeVenueId  String?  @map("home_venue_id")
+  logoUrl      String?  @map("logo_url")
+  metadata     Json?
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  homeVenue         Venue?           @relation(fields: [homeVenueId], references: [id])
+  playerContracts   PlayerContract[]
+  matchesAsTeamA    Match[]          @relation("TeamA")
+  matchesAsTeamB    Match[]          @relation("TeamB")
+  tossWinnerMatches Match[]          @relation("TossWinner")
+  winnerMatches     Match[]          @relation("Winner")
+  inningsBatting    Inning[]         @relation("BattingTeam")
+  inningsBowling    Inning[]         @relation("BowlingTeam")
+  playerMatchStats  PlayerMatchStat[]
+  teamMatchStats    TeamMatchStat[]
+
+  @@map("teams")
+}
+
+model Player {
+  id            String   @id @default(uuid())
+  fullName      String   @map("full_name")
+  knownAs       String?  @map("known_as")
+  slug          String   @unique
+  gender        String
+  dateOfBirth   DateTime? @map("date_of_birth") @db.Date
+  nationality   String
+  battingStyle  String?  @map("batting_style")
+  bowlingStyle  String?  @map("bowling_style")
+  playerRole    PlayerRole @map("player_role")
+  isActive      Boolean  @default(true) @map("is_active")
+  photoUrl      String?  @map("photo_url")
+  externalIds   Json?    @map("external_ids")
+  metadata      Json?
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  playerContracts     PlayerContract[]
+  matchesAsPlayerOfMatch Match[]       @relation("PlayerOfMatch")
+  ballEventsAsBatsman    BallEvent[]   @relation("Batsman")
+  ballEventsAsBowler      BallEvent[]   @relation("Bowler")
+  ballEventsAsNonStriker  BallEvent[]   @relation("NonStriker")
+  ballEventsAsDismissed   BallEvent[]   @relation("DismissedPlayer")
+  ballEventsAsFielder     BallEvent[]   @relation("Fielder")
+  playerMatchStats       PlayerMatchStat[]
+
+  @@map("players")
+}
+
+model PlayerContract {
+  id          String   @id @default(uuid())
+  playerId    String   @map("player_id")
+  teamId      String   @map("team_id")
+  seasonId    String   @map("season_id")
+  startDate   DateTime @map("start_date") @db.Date
+  endDate     DateTime @map("end_date") @db.Date
+  role        String   // Captain, Player, Coach
+  shirtNumber Int?     @map("shirt_number")
+  metadata    Json?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  player   Player   @relation(fields: [playerId], references: [id])
+  team     Team     @relation(fields: [teamId], references: [id])
+  season   Season   @relation(fields: [seasonId], references: [id])
+
+  @@map("player_contracts")
+}
+
+model Match {
+  id                String   @id @default(uuid())
+  competitionId     String   @map("competition_id")
+  seasonId          String   @map("season_id")
+  venueId           String   @map("venue_id")
+  title             String
+  slug              String   @unique
+  matchType         MatchType @map("match_type")
+  status            MatchStatus
+  startTimeUtc      DateTime @map("start_time_utc")
+  endTimeUtc        DateTime? @map("end_time_utc")
+  teamAId           String   @map("team_a_id")
+  teamBId           String   @map("team_b_id")
+  tossWinnerId      String?  @map("toss_winner_id")
+  tossDecision      TossDecision? @map("toss_decision")
+  winnerTeamId      String?  @map("winner_team_id")
+  playerOfMatchId   String?  @map("player_of_match_id")
+  oversLimit        Int?     @map("overs_limit")
+  targetRuns        Int?     @map("target_runs")
+  externalIds       Json?    @map("external_ids")
+  metadata          Json?
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  competition       Competition @relation(fields: [competitionId], references: [id])
+  season            Season      @relation(fields: [seasonId], references: [id])
+  venue             Venue       @relation(fields: [venueId], references: [id])
+  teamA             Team        @relation("TeamA", fields: [teamAId], references: [id])
+  teamB             Team        @relation("TeamB", fields: [teamBId], references: [id])
+  tossWinner        Team?       @relation("TossWinner", fields: [tossWinnerId], references: [id])
+  winner            Team?       @relation("Winner", fields: [winnerTeamId], references: [id])
+  playerOfMatch     Player?     @relation("PlayerOfMatch", fields: [playerOfMatchId], references: [id])
+  innings           Inning[]
+  ballEvents        BallEvent[]
+  playerMatchStats  PlayerMatchStat[]
+  teamMatchStats    TeamMatchStat[]
+  matchSummary      MatchSummary?
+
+  @@map("matches")
+}
+
+model Inning {
+  id                String   @id @default(uuid())
+  matchId           String   @map("match_id")
+  inningNumber      Int      @map("inning_number") // 1..4
+  battingTeamId     String   @map("batting_team_id")
+  bowlingTeamId     String   @map("bowling_team_id")
+  runs              Int      @default(0)
+  wickets           Int      @default(0)
+  overs             Decimal  @db.Decimal(5, 1) @default(0)
+  extras            Int      @default(0)
+  declared          Boolean  @default(false)
+  allOut            Boolean  @default(false) @map("all_out")
+  inningsStartTime  DateTime? @map("innings_start_time")
+  inningsEndTime    DateTime? @map("innings_end_time")
+  isCurrent         Boolean  @default(false) @map("is_current")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  match         Match      @relation(fields: [matchId], references: [id])
+  battingTeam   Team       @relation("BattingTeam", fields: [battingTeamId], references: [id])
+  bowlingTeam   Team       @relation("BowlingTeam", fields: [bowlingTeamId], references: [id])
+  ballEvents    BallEvent[]
+
+  @@map("innings")
+}
+
+model BallEvent {
+  id                  String   @id @default(uuid())
+  matchId             String   @map("match_id")
+  inningsId           String   @map("innings_id")
+  overNumber           Int      @map("over_number")
+  ballInOver           Int      @map("ball_in_over")
+  batsmanId            String   @map("batsman_id")
+  bowlerId             String   @map("bowler_id")
+  nonStrikerId         String   @map("non_striker_id")
+  runsBatsman          Int      @default(0) @map("runs_batsman")
+  runsExtras           Int      @default(0) @map("runs_extras")
+  extraType            String?  @map("extra_type") // NoBall, Wide, LegBye, Bye, Penalty, None
+  wicket               Boolean  @default(false)
+  wicketType           String?  @map("wicket_type") // Bowled, Caught, LBW, RunOut, Stumped, Obstructing, None
+  dismissedPlayerId    String?  @map("dismissed_player_id")
+  fielderId            String?  @map("fielder_id")
+  commentaryText       String?  @map("commentary_text") @db.Text
+  ballTimestamp        DateTime @map("ball_timestamp")
+  metadata             Json?    // wagon wheel, shot_type, pitch coords, video refs
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  match             Match   @relation(fields: [matchId], references: [id])
+  innings           Inning  @relation(fields: [inningsId], references: [id])
+  batsman           Player  @relation("Batsman", fields: [batsmanId], references: [id])
+  bowler            Player  @relation("Bowler", fields: [bowlerId], references: [id])
+  nonStriker        Player  @relation("NonStriker", fields: [nonStrikerId], references: [id])
+  dismissedPlayer   Player? @relation("DismissedPlayer", fields: [dismissedPlayerId], references: [id])
+  fielder           Player? @relation("Fielder", fields: [fielderId], references: [id])
+
+  @@map("ball_events")
+}
+
+model PlayerMatchStat {
+  id                String   @id @default(uuid())
+  matchId           String   @map("match_id")
+  playerId          String   @map("player_id")
+  teamId            String   @map("team_id")
+  battingRuns       Int      @default(0) @map("batting_runs")
+  battingBalls      Int      @default(0) @map("batting_balls")
+  battingFours      Int      @default(0) @map("batting_fours")
+  battingSixes      Int      @default(0) @map("batting_sixes")
+  strikeRate        Decimal? @map("strike_rate") @db.Decimal(6, 2)
+  bowlingOvers       Decimal? @map("bowling_overs") @db.Decimal(4, 1)
+  bowlingRunsConceded Int?   @map("bowling_runs_conceded")
+  bowlingWickets    Int      @default(0) @map("bowling_wickets")
+  bowlingMaidens    Int      @default(0) @map("bowling_maidens")
+  economyRate       Decimal? @map("economy_rate") @db.Decimal(6, 2)
+  catches           Int      @default(0)
+  runouts           Int      @default(0)
+  stumpings         Int      @default(0)
+  manOfMatch        Boolean  @default(false) @map("man_of_match")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  match  Match  @relation(fields: [matchId], references: [id])
+  player Player @relation(fields: [playerId], references: [id])
+  team   Team   @relation(fields: [teamId], references: [id])
+
+  @@map("player_match_stats")
+}
+
+model TeamMatchStat {
+  id             String   @id @default(uuid())
+  matchId        String   @map("match_id")
+  teamId         String   @map("team_id")
+  runs           Int      @default(0)
+  wickets        Int      @default(0)
+  overs          Decimal  @db.Decimal(5, 1) @default(0)
+  extras         Int      @default(0)
+  totalFours     Int      @default(0) @map("total_fours")
+  totalSixes     Int      @default(0) @map("total_sixes")
+  result         String?  // Win, Loss, Tie, NR
+  pointsAwarded  Int?     @map("points_awarded")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  match Match @relation(fields: [matchId], references: [id])
+  team  Team  @relation(fields: [teamId], references: [id])
+
+  @@map("team_match_stats")
+}
+
+model MatchSummary {
+  id           String   @id @default(uuid())
+  matchId      String   @unique @map("match_id")
+  summaryText  String?  @map("summary_text") @db.Text
+  homeScore    Json?    @map("home_score") // quick view of innings totals
+  awayScore    Json?    @map("away_score")
+  state        Json?    // cached live state for fast API reads
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  match Match @relation(fields: [matchId], references: [id])
+
+  @@map("match_summary")
+}
+
+model User {
+  id           String   @id @default(uuid())
+  username     String   @unique
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  role         String   // admin, editor, user
+  displayName  String   @map("display_name")
+  avatarUrl    String?  @map("avatar_url")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  postsAsAuthor     Post[]   @relation("Author")
+  following         Follow[] @relation("Following")
+  followers         Follow[] @relation("Follower")
+
+  @@map("users")
+}
+
+model Follow {
+  id               String   @id @default(uuid())
+  followingUserId   String   @map("following_user_id")
+  followedUserId    String   @map("followed_user_id")
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  // Relations
+  followingUser User @relation("Following", fields: [followingUserId], references: [id])
+  followedUser  User @relation("Follower", fields: [followedUserId], references: [id])
+
+  @@unique([followingUserId, followedUserId])
+  @@map("follows")
+}
+
+model Post {
+  id        String   @id @default(uuid())
+  title     String
+  body      String   @db.Text // Content of the post
+  userId    String   @map("user_id")
+  status    String   // draft, published, archived
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  user User @relation("Author", fields: [userId], references: [id])
+
+  @@map("posts")
+}
+
+model ExternalProvider {
+  id        String   @id @default(uuid())
+  name      String
+  baseUrl   String   @map("base_url")
+  apiKey    String?  @map("api_key")
+  metadata  Json?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  providerIdsMaps ProviderIdsMap[]
+
+  @@map("external_providers")
+}
+
+model ProviderIdsMap {
+  id          String   @id @default(uuid())
+  providerId  String   @map("provider_id")
+  entityType  String   @map("entity_type") // player, team, match, season
+  entityId    String   @map("entity_id") // local uuid for entity
+  externalRef String   @map("external_ref") // provider side id
+  metadata    Json?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  provider ExternalProvider @relation(fields: [providerId], references: [id])
+
+  @@map("provider_ids_map")
+}

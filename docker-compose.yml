@@ -1,0 +1,18 @@
+version: '3.9'
+
+services:
+  batbliz-db:
+    image: postgres:15
+    container_name: batbliz_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: batbliz
+      POSTGRES_PASSWORD: batbliz
+      POSTGRES_DB: batbliz_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - batbliz_data:/var/lib/postgresql/data
+
+volumes:
+  batbliz_data:
