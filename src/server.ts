@@ -8,17 +8,19 @@ import crudRoutes from "./routes/crud.js";
 import cors from "cors";
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT ? Number(process.env.PORT) : 3000;
 
 dotenv.config();
 
 app.use(cookieParser());
 app.use(express.json());
 
+
 app.use(cors({
-  origin: "http://localhost:3000",
+  origin: ["http://localhost:3000", "https://batbliz-admin.vercel.app"],
   credentials: true
 }));
+
 
 // Admin API routes
 app.use("/admin/schema", adminRoutes);
@@ -50,8 +52,7 @@ app.get("/", (req: Request, res: Response) => {
   res.send("Hello World");
 });
 
-app.listen(PORT, async () => {
-  console.log(
+app.listen(PORT, '0.0.0.0', async () => {  console.log(
     `🚀 Server running in ${process.env.NODE_ENV || 'dev'} mode on port ${PORT}`
   );
   console.log(`📡 Health check available at: http://localhost:${PORT}/health`);
