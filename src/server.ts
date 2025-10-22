@@ -3,6 +3,9 @@ import express, { type Request, type Response } from "express";
 import dotenv from "dotenv";
 import cookieParser from "cookie-parser";
 import prisma from "../db/db.config.js";
+import adminRoutes from "./routes/admin.js";
+import crudRoutes from "./routes/crud.js";
+import cors from "cors";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -11,6 +14,15 @@ dotenv.config();
 
 app.use(cookieParser());
 app.use(express.json());
+
+app.use(cors({
+  origin: "http://localhost:3000",
+  credentials: true
+}));
+
+// Admin API routes
+app.use("/admin/schema", adminRoutes);
+app.use("/admin/crud", crudRoutes);
 
 // Health check endpoint
 app.get("/health", async (req: Request, res: Response) => {

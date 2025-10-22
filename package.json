@@ -6,8 +6,8 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "nodemon --exec \"tsx\" src/server.ts",
-    "start": "node src/server.ts"
-
+    "start": "node src/server.ts",
+    "test:admin": "node test-admin-api.js"
   },
   "keywords": [],
   "author": "",
@@ -16,12 +16,15 @@
   "dependencies": {
     "@prisma/client": "^6.17.1",
     "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
+    "node-fetch": "^3.3.2",
     "nodemon": "^3.1.10"
   },
   "devDependencies": {
     "@types/cookie-parser": "^1.4.9",
+    "@types/cors": "^2.8.19",
     "@types/express": "^5.0.3",
     "@types/node": "^24.7.2",
     "prisma": "^6.17.1",
