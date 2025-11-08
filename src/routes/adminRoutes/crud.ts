@@ -1,5 +1,5 @@
 import express, { type Request, type Response } from "express";
-import prisma from "../../db/db.config.js";
+import prisma from "../../../db/db.config.js";
 
 const router = express.Router();
 
@@ -8,7 +8,7 @@ const router = express.Router();
 // ============================================
 const ENUMS = {
   CompetitionStatus: ["PLANNED", "ONGOING", "COMPLETED"],
-  CompetitionType: ["ODI", "T20", "TEST"],
+  CompetitionType: ["ODI", "T20", "TEST", "MIX"],
   TeamType: ["NATIONAL", "DOMESTIC", "FRANCHISE", "CLUB"],
   PlayerRole: ["BATSMAN", "BOWLER", "ALLROUNDER", "WICKETKEEPER"],
   MatchType: ["TEST", "ODI", "T20", "T10", "OTHER"],
@@ -75,8 +75,8 @@ const MODELS: Record<string, ModelConfig> = {
     searchFields: [],
     defaultSort: { field: "inningNumber", order: "asc" },
   },
-  ballEvent: {
-    name: "BallEvent",
+  ball_events: {
+    name: "ball_events",
     prismaModel: prisma.ballEvent,
     searchFields: ["commentaryText"],
     defaultSort: { field: "ballTimestamp", order: "asc" },
@@ -97,36 +97,6 @@ const MODELS: Record<string, ModelConfig> = {
     name: "MatchSummary",
     prismaModel: prisma.matchSummary,
     searchFields: ["summaryText"],
-    defaultSort: { field: "createdAt", order: "desc" },
-  },
-  user: {
-    name: "User",
-    prismaModel: prisma.user,
-    searchFields: ["username", "email", "displayName"],
-    defaultSort: { field: "createdAt", order: "desc" },
-  },
-  follow: {
-    name: "Follow",
-    prismaModel: prisma.follow,
-    searchFields: [],
-    defaultSort: { field: "createdAt", order: "desc" },
-  },
-  post: {
-    name: "Post",
-    prismaModel: prisma.post,
-    searchFields: ["title", "body"],
-    defaultSort: { field: "createdAt", order: "desc" },
-  },
-  externalProvider: {
-    name: "ExternalProvider",
-    prismaModel: prisma.externalProvider,
-    searchFields: ["name", "baseUrl"],
-    defaultSort: { field: "name", order: "asc" },
-  },
-  providerIdsMap: {
-    name: "ProviderIdsMap",
-    prismaModel: prisma.providerIdsMap,
-    searchFields: ["entityType", "externalRef"],
     defaultSort: { field: "createdAt", order: "desc" },
   },
 };
@@ -173,6 +143,32 @@ function transformDateFields(data: any): any {
   });
   
   return transformed;
+}
+
+/**
+ * Convert snake_case keys in incoming payloads to camelCase expected by Prisma
+ * without overwriting already-present camelCase keys.
+ */
+function normalizeInputFields(input: any): any {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    return input;
+  }
+
+  const toCamel = (str: string) =>
+    str.replace(/_([a-z])/g, (_m, p1: string) => p1.toUpperCase());
+
+  const normalized: any = { ...input };
+  Object.keys(input).forEach((key) => {
+    if (key.includes('_')) {
+      const camelKey = toCamel(key);
+      if (!(camelKey in normalized)) {
+        normalized[camelKey] = input[key];
+      }
+      delete normalized[key];
+    }
+  });
+
+  return normalized;
 }
 
 /*** Validate enum values*/
@@ -416,8 +412,11 @@ router.post("/:model", async (req: Request, res: Response) => {
       });
     }
 
+    // Normalize keys (e.g., competition_id -> competitionId)
+    const normalizedBody = normalizeInputFields(req.body);
+
     // Validate enum fields
-    const enumValidation = validateEnumFields(req.body, model);
+    const enumValidation = validateEnumFields(normalizedBody, model);
     if (!enumValidation.isValid) {
       return res.status(400).json({
         success: false,
@@ -427,8 +426,7 @@ router.post("/:model", async (req: Request, res: Response) => {
     }
 
     // Transform date fields
-    const transformedData = transformDateFields(req.body);
-
+    const transformedData = transformDateFields(normalizedBody);
     const data = await modelConfig.prismaModel.create({
       data: transformedData,
     });
@@ -451,7 +449,7 @@ router.post("/:model", async (req: Request, res: Response) => {
 /*** PUT /:model/:id - Update a record by ID*/
 router.put("/:model/:id", async (req: Request, res: Response) => {
   try {
-    const { model, id } = req.params;
+    let { model, id } = req.params;
     const modelConfig = validateModel(model);
 
     if (!modelConfig) {
@@ -469,8 +467,11 @@ router.put("/:model/:id", async (req: Request, res: Response) => {
       });
     }
 
+    // Normalize keys
+    const normalizedBody = normalizeInputFields(req.body);
+
     // Validate enum fields
-    const enumValidation = validateEnumFields(req.body, model);
+    const enumValidation = validateEnumFields(normalizedBody, model);
     if (!enumValidation.isValid) {
       return res.status(400).json({
         success: false,
@@ -479,9 +480,24 @@ router.put("/:model/:id", async (req: Request, res: Response) => {
       });
     }
 
+    // Validate and parse ID
+    if (!id) {
+      return res.status(400).json({
+        success: false,
+        error: "ID is required",
+      });
+    }
+    const recordId = parseInt(id);
+    if (isNaN(recordId)) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid ID format",
+      });
+    }
+
     // Check if record exists
     const existing = await modelConfig.prismaModel.findUnique({
-      where: { id },
+      where: { id: recordId },
     });
 
     if (!existing) {
@@ -492,10 +508,10 @@ router.put("/:model/:id", async (req: Request, res: Response) => {
     }
 
     // Transform date fields
-    const transformedData = transformDateFields(req.body);
+    const transformedData = transformDateFields(normalizedBody);
 
     const data = await modelConfig.prismaModel.update({
-      where: { id },
+      where: { id: recordId },
       data: transformedData,
     });
 
@@ -535,8 +551,11 @@ router.patch("/:model/:id", async (req: Request, res: Response) => {
       });
     }
 
+    // Normalize keys
+    const normalizedBody = normalizeInputFields(req.body);
+
     // Validate enum fields
-    const enumValidation = validateEnumFields(req.body, model);
+    const enumValidation = validateEnumFields(normalizedBody, model);
     if (!enumValidation.isValid) {
       return res.status(400).json({
         success: false,
@@ -545,9 +564,24 @@ router.patch("/:model/:id", async (req: Request, res: Response) => {
       });
     }
 
+    // Validate and parse ID
+    if (!id) {
+      return res.status(400).json({
+        success: false,
+        error: "ID is required",
+      });
+    }
+    const recordId = parseInt(id, 10);
+    if (isNaN(recordId)) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid ID format",
+      });
+    }
+
     // Check if record exists
     const existing = await modelConfig.prismaModel.findUnique({
-      where: { id },
+      where: { id: recordId },
     });
 
     if (!existing) {
@@ -558,10 +592,10 @@ router.patch("/:model/:id", async (req: Request, res: Response) => {
     }
 
     // Transform date fields
-    const transformedData = transformDateFields(req.body);
+    const transformedData = transformDateFields(normalizedBody);
 
     const data = await modelConfig.prismaModel.update({
-      where: { id },
+      where: { id: recordId },
       data: transformedData,
     });
 
@@ -593,9 +627,24 @@ router.delete("/:model/:id", async (req: Request, res: Response) => {
       });
     }
 
+    if (!id) {
+      return res.status(400).json({
+        success: false,
+        error: "ID is required",
+      });
+    }
+
+    const recordId = parseInt(id);
+    if (isNaN(recordId)) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid ID format",
+      });
+    }
+
     // Check if record exists
     const existing = await modelConfig.prismaModel.findUnique({
-      where: { id },
+      where: { id: recordId },
     });
 
     if (!existing) {
@@ -606,13 +655,13 @@ router.delete("/:model/:id", async (req: Request, res: Response) => {
     }
 
     await modelConfig.prismaModel.delete({
-      where: { id },
+      where: { id: recordId },
     });
 
     res.json({
       success: true,
       message: `${modelConfig.name} deleted successfully`,
-      deletedId: id,
+      deletedId: recordId,
     });
   } catch (error) {
     console.error(`Error deleting ${req.params.model}/${req.params.id}:`, error);
@@ -648,13 +697,14 @@ router.post("/:model/bulk", async (req: Request, res: Response) => {
     // Validate and transform each item
     const transformedData = req.body.map((item, index) => {
       // Validate enum fields for each item
-      const enumValidation = validateEnumFields(item, model);
+      const normalizedItem = normalizeInputFields(item);
+      const enumValidation = validateEnumFields(normalizedItem, model);
       if (!enumValidation.isValid) {
         throw new Error(`Item ${index}: ${enumValidation.errors.join(', ')}`);
       }
       
       // Transform date fields
-      return transformDateFields(item);
+      return transformDateFields(normalizedItem);
     });
 
     const result = await modelConfig.prismaModel.createMany({

@@ -1,5 +1,5 @@
 import express, { type Request, type Response } from "express";
-import prisma from "../../db/db.config.js";
+import prisma from "../../../db/db.config.js";
 
 const router = express.Router();
 
@@ -98,6 +98,30 @@ router.get("/tables/:tableName/columns", async (req: Request, res: Response) => 
 
     if (tableName === 'competition') {
       tableName = 'competitions';
+    }
+
+    if (tableName === 'match') {
+      tableName = 'matches';
+    }
+
+    if (tableName === 'player') {
+      tableName = 'players';
+    }
+
+    if (tableName === 'team') {
+      tableName = 'teams';
+    }
+
+    if (tableName === "inning") {
+      tableName = "innings";
+    }
+
+    if (tableName == "ball_event") {
+      tableName = "ball_events";
+    }
+
+    if (tableName == "season") {
+      tableName = "seasons";
     }
     
     const columns = await prisma.$queryRaw<Array<{

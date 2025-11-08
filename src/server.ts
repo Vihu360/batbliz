@@ -3,10 +3,12 @@ import express, { type Request, type Response } from "express";
 import dotenv from "dotenv";
 import cookieParser from "cookie-parser";
 import prisma from "../db/db.config.js";
-import adminRoutes from "./routes/admin.js";
-import crudRoutes from "./routes/crud.js";
+import adminRoutes from "./routes/adminRoutes/admin.js";
+import crudRoutes from "./routes/adminRoutes/crud.js";
 import cors from "cors";
-
+import competitionRoutes from "./routes/adminRoutes/competition/competition.route.js";
+import venueRoutes from "./routes/adminRoutes/competition/venue.routes.js";
+import commonRoutes from "./routes/adminRoutes/competition/common.routes.js";
 const app = express();
 const PORT = process.env.PORT ? Number(process.env.PORT) : 3000;
 
@@ -17,7 +19,7 @@ app.use(express.json());
 
 
 app.use(cors({
-  origin: ["http://localhost:3000", "https://batbliz-admin.vercel.app"],
+  origin: ["http://localhost:3000", "https://batbliz-admin.vercel.app", "http://localhost:3002"],
   credentials: true
 }));
 
@@ -25,6 +27,9 @@ app.use(cors({
 // Admin API routes
 app.use("/admin/schema", adminRoutes);
 app.use("/admin/crud", crudRoutes);
+app.use("/admin/competition", competitionRoutes);
+app.use("/admin/venue", venueRoutes);
+app.use("/admin/common", commonRoutes);
 
 // Health check endpoint
 app.get("/health", async (req: Request, res: Response) => {
@@ -57,7 +62,6 @@ app.listen(PORT, '0.0.0.0', async () => {  console.log(
   );
   console.log(`📡 Health check available at: http://localhost:${PORT}/health`);
   console.log(`🗄️  Database: PostgreSQL (Docker)`);
-  console.log("");
 
   // Initialize database connection
   try {
