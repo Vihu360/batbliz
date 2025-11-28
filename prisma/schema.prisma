@@ -59,6 +59,13 @@ enum TossDecision {
   BOWL
 }
 
+enum SquadRole {
+  SELECTED
+  PLAYING_XI
+  SUBSTITUTE
+}
+
+
 // --- Core domain
 model Competition {
   id           Int   @id @default(autoincrement())
@@ -138,6 +145,7 @@ model Team {
   inningsBowling    Inning[]         @relation("BowlingTeam")
   playerMatchStats  PlayerMatchStat[]
   teamMatchStats    TeamMatchStat[]
+  matchSquads       MatchSquad[]
 
   @@map("teams")
 }
@@ -167,6 +175,7 @@ model Player {
   ballEventsAsDismissed   BallEvent[]   @relation("DismissedPlayer")
   ballEventsAsFielder     BallEvent[]   @relation("Fielder")
   playerMatchStats       PlayerMatchStat[]
+  matchSquads            MatchSquad[]
 
   @@map("players")
 }
@@ -191,6 +200,20 @@ model PlayerContract {
   season   Season?   @relation(fields: [seasonId], references: [id])
 
   @@map("player_contracts")
+}
+
+model MatchSquad {
+  id        Int     @id @default(autoincrement())
+  matchId   Int
+  playerId  Int
+  teamId    Int
+  role      SquadRole  @default(SELECTED)
+
+  match    Match  @relation(fields: [matchId], references: [id])
+  player   Player @relation(fields: [playerId], references: [id])
+  team     Team   @relation(fields: [teamId], references: [id])
+
+  @@unique([matchId, playerId])
 }
 
 model Match {
@@ -225,6 +248,7 @@ model Match {
   tossWinner        Team?       @relation("TossWinner", fields: [tossWinnerId], references: [id])
   winner            Team?       @relation("Winner", fields: [winnerTeamId], references: [id])
   playerOfMatch     Player?     @relation("PlayerOfMatch", fields: [playerOfMatchId], references: [id])
+  matchSquads       MatchSquad[]
   innings           Inning[]
   ballEvents        BallEvent[]
   playerMatchStats  PlayerMatchStat[]

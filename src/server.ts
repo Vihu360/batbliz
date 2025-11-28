@@ -9,6 +9,7 @@ import cors from "cors";
 import competitionRoutes from "./routes/adminRoutes/competition/competition.route.js";
 import venueRoutes from "./routes/adminRoutes/competition/venue.routes.js";
 import commonRoutes from "./routes/adminRoutes/competition/common.routes.js";
+import matchRoutes from "./routes/adminRoutes/competition/match.routes.js";
 const app = express();
 const PORT = process.env.PORT ? Number(process.env.PORT) : 3000;
 
@@ -30,6 +31,7 @@ app.use("/admin/crud", crudRoutes);
 app.use("/admin/competition", competitionRoutes);
 app.use("/admin/venue", venueRoutes);
 app.use("/admin/common", commonRoutes);
+app.use("/admin/match", matchRoutes);
 
 // Health check endpoint
 app.get("/health", async (req: Request, res: Response) => {
