@@ -1,0 +1,351 @@
+{
+  "info": {
+    "name": "BatBliz Ball Event API",
+    "description": "Collection for testing Ball Event API endpoints with real-time Socket.IO integration",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "matchId",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "inningsId",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "batsmanId",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "bowlerId",
+      "value": "2",
+      "type": "string"
+    },
+    {
+      "key": "nonStrikerId",
+      "value": "3",
+      "type": "string"
+    },
+    {
+      "key": "ballEventId",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Get All Ball Events",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/admin/ball-event?page=1&limit=20",
+          "host": ["{{baseUrl}}"],
+          "path": ["admin", "ball-event"],
+          "query": [
+            {
+              "key": "page",
+              "value": "1",
+              "description": "Page number"
+            },
+            {
+              "key": "limit",
+              "value": "20",
+              "description": "Items per page"
+            },
+            {
+              "key": "search",
+              "value": "",
+              "disabled": true,
+              "description": "Search in commentary"
+            },
+            {
+              "key": "matchId",
+              "value": "",
+              "disabled": true,
+              "description": "Filter by match"
+            },
+            {
+              "key": "inningsId",
+              "value": "",
+              "disabled": true,
+              "description": "Filter by innings"
+            },
+            {
+              "key": "wicket",
+              "value": "true",
+              "disabled": true,
+              "description": "Filter wickets only"
+            }
+          ]
+        },
+        "description": "Get paginated list of all ball events with optional filters"
+      },
+      "response": []
+    },
+    {
+      "name": "Get Ball Event by ID",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/admin/ball-event/{{ballEventId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["admin", "ball-event", "{{ballEventId}}"]
+        },
+        "description": "Get a specific ball event by its ID"
+      },
+      "response": []
+    },
+    {
+      "name": "Get Ball Events by Match",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/admin/ball-event/match/{{matchId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["admin", "ball-event", "match", "{{matchId}}"]
+        },
+        "description": "Get all ball events for a specific match"
+      },
+      "response": []
+    },
+    {
+      "name": "Get Ball Events by Innings",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/admin/ball-event/innings/{{inningsId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["admin", "ball-event", "innings", "{{inningsId}}"]
+        },
+        "description": "Get all ball events for a specific innings"
+      },
+      "response": []
+    },
+    {
+      "name": "Create Ball Event - Single",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "if (pm.response.code === 201) {",
+              "    const response = pm.response.json();",
+              "    if (response.data && response.data.id) {",
+              "        pm.collectionVariables.set('ballEventId', response.data.id);",
+              "        console.log('Ball Event ID saved:', response.data.id);",
+              "    }",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"matchId\": {{matchId}},\n  \"inningsId\": {{inningsId}},\n  \"overNumber\": 0,\n  \"ballInOver\": 1,\n  \"batsmanId\": {{batsmanId}},\n  \"bowlerId\": {{bowlerId}},\n  \"nonStrikerId\": {{nonStrikerId}},\n  \"runsBatsman\": 1,\n  \"runsExtras\": 0,\n  \"extraType\": null,\n  \"wicket\": false,\n  \"wicketType\": null,\n  \"dismissedPlayerId\": null,\n  \"fielderId\": null,\n  \"commentaryText\": \"Good length delivery, pushed to mid-off for a single\",\n  \"ballTimestamp\": \"{{$isoTimestamp}}\",\n  \"metadata\": {}\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/admin/ball-event",
+          "host": ["{{baseUrl}}"],
+          "path": ["admin", "ball-event"]
+        },
+        "description": "Create a normal ball event (single run). Triggers real-time Socket.IO event."
+      },
+      "response": []
+    },
+    {
+      "name": "Create Ball Event - Four",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"matchId\": {{matchId}},\n  \"inningsId\": {{inningsId}},\n  \"overNumber\": 0,\n  \"ballInOver\": 2,\n  \"batsmanId\": {{batsmanId}},\n  \"bowlerId\": {{bowlerId}},\n  \"nonStrikerId\": {{nonStrikerId}},\n  \"runsBatsman\": 4,\n  \"runsExtras\": 0,\n  \"extraType\": null,\n  \"wicket\": false,\n  \"wicketType\": null,\n  \"dismissedPlayerId\": null,\n  \"fielderId\": null,\n  \"commentaryText\": \"Short and wide, cut away for FOUR!\",\n  \"ballTimestamp\": \"{{$isoTimestamp}}\",\n  \"metadata\": {\n    \"shotType\": \"cut\",\n    \"pitchMap\": { \"x\": 2.5, \"y\": 1.2 }\n  }\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/admin/ball-event",
+          "host": ["{{baseUrl}}"],
+          "path": ["admin", "ball-event"]
+        },
+        "description": "Create a boundary (four). Triggers ball-event, boundary, and innings-update events."
+      },
+      "response": []
+    },
+    {
+      "name": "Create Ball Event - Six",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"matchId\": {{matchId}},\n  \"inningsId\": {{inningsId}},\n  \"overNumber\": 0,\n  \"ballInOver\": 3,\n  \"batsmanId\": {{batsmanId}},\n  \"bowlerId\": {{bowlerId}},\n  \"nonStrikerId\": {{nonStrikerId}},\n  \"runsBatsman\": 6,\n  \"runsExtras\": 0,\n  \"extraType\": null,\n  \"wicket\": false,\n  \"wicketType\": null,\n  \"dismissedPlayerId\": null,\n  \"fielderId\": null,\n  \"commentaryText\": \"Tossed up, smashed over long-on for SIX!\",\n  \"ballTimestamp\": \"{{$isoTimestamp}}\",\n  \"metadata\": {\n    \"shotType\": \"lofted drive\",\n    \"distance\": 85\n  }\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/admin/ball-event",
+          "host": ["{{baseUrl}}"],
+          "path": ["admin", "ball-event"]
+        },
+        "description": "Create a six. Triggers ball-event, boundary, and innings-update events."
+      },
+      "response": []
+    },
+    {
+      "name": "Create Ball Event - Wicket",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"matchId\": {{matchId}},\n  \"inningsId\": {{inningsId}},\n  \"overNumber\": 0,\n  \"ballInOver\": 4,\n  \"batsmanId\": {{batsmanId}},\n  \"bowlerId\": {{bowlerId}},\n  \"nonStrikerId\": {{nonStrikerId}},\n  \"runsBatsman\": 0,\n  \"runsExtras\": 0,\n  \"extraType\": null,\n  \"wicket\": true,\n  \"wicketType\": \"Bowled\",\n  \"dismissedPlayerId\": {{batsmanId}},\n  \"fielderId\": null,\n  \"commentaryText\": \"Bowled! The stumps are shattered! What a delivery!\",\n  \"ballTimestamp\": \"{{$isoTimestamp}}\",\n  \"metadata\": {\n    \"wicketType\": \"bowled\",\n    \"speedKmh\": 142\n  }\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/admin/ball-event",
+          "host": ["{{baseUrl}}"],
+          "path": ["admin", "ball-event"]
+        },
+        "description": "Create a wicket event. Triggers ball-event, wicket, and innings-update events."
+      },
+      "response": []
+    },
+    {
+      "name": "Create Ball Event - Wide",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"matchId\": {{matchId}},\n  \"inningsId\": {{inningsId}},\n  \"overNumber\": 0,\n  \"ballInOver\": 4,\n  \"batsmanId\": {{batsmanId}},\n  \"bowlerId\": {{bowlerId}},\n  \"nonStrikerId\": {{nonStrikerId}},\n  \"runsBatsman\": 0,\n  \"runsExtras\": 1,\n  \"extraType\": \"Wide\",\n  \"wicket\": false,\n  \"wicketType\": null,\n  \"dismissedPlayerId\": null,\n  \"fielderId\": null,\n  \"commentaryText\": \"Wide down the leg side\",\n  \"ballTimestamp\": \"{{$isoTimestamp}}\",\n  \"metadata\": {}\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/admin/ball-event",
+          "host": ["{{baseUrl}}"],
+          "path": ["admin", "ball-event"]
+        },
+        "description": "Create a wide ball. Note: Wides don't count as legitimate deliveries for overs."
+      },
+      "response": []
+    },
+    {
+      "name": "Create Ball Event - No Ball",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"matchId\": {{matchId}},\n  \"inningsId\": {{inningsId}},\n  \"overNumber\": 0,\n  \"ballInOver\": 5,\n  \"batsmanId\": {{batsmanId}},\n  \"bowlerId\": {{bowlerId}},\n  \"nonStrikerId\": {{nonStrikerId}},\n  \"runsBatsman\": 1,\n  \"runsExtras\": 1,\n  \"extraType\": \"NoBall\",\n  \"wicket\": false,\n  \"wicketType\": null,\n  \"dismissedPlayerId\": null,\n  \"fielderId\": null,\n  \"commentaryText\": \"No ball! Free hit coming up. Batsman takes a single.\",\n  \"ballTimestamp\": \"{{$isoTimestamp}}\",\n  \"metadata\": {\n    \"freeHitNext\": true\n  }\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/admin/ball-event",
+          "host": ["{{baseUrl}}"],
+          "path": ["admin", "ball-event"]
+        },
+        "description": "Create a no ball with runs scored. Note: No balls don't count as legitimate deliveries."
+      },
+      "response": []
+    },
+    {
+      "name": "Update Ball Event",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"commentaryText\": \"Updated commentary: Beautifully timed for a single\",\n  \"metadata\": {\n    \"edited\": true,\n    \"editedAt\": \"{{$isoTimestamp}}\"\n  }\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/admin/ball-event/{{ballEventId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["admin", "ball-event", "{{ballEventId}}"]
+        },
+        "description": "Update an existing ball event. Recalculates innings stats if runs/wickets changed."
+      },
+      "response": []
+    },
+    {
+      "name": "Delete Ball Event",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/admin/ball-event/{{ballEventId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["admin", "ball-event", "{{ballEventId}}"]
+        },
+        "description": "Delete a ball event and update innings statistics accordingly."
+      },
+      "response": []
+    },
+    {
+      "name": "Get Wickets Only",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/admin/ball-event?wicket=true",
+          "host": ["{{baseUrl}}"],
+          "path": ["admin", "ball-event"],
+          "query": [
+            {
+              "key": "wicket",
+              "value": "true"
+            }
+          ]
+        },
+        "description": "Get only wicket events using the wicket filter"
+      },
+      "response": []
+    }
+  ]
+}
+

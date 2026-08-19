@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BatBliz Socket.IO Client Example</title>
+  <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .container {
+      background: white;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    h1 {
+      color: #333;
+    }
+    h2 {
+      color: #666;
+      margin-top: 0;
+    }
+    .status {
+      padding: 10px;
+      border-radius: 4px;
+      margin-bottom: 15px;
+      font-weight: bold;
+    }
+    .status.connected {
+      background: #d4edda;
+      color: #155724;
+    }
+    .status.disconnected {
+      background: #f8d7da;
+      color: #721c24;
+    }
+    .controls {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 15px;
+    }
+    input, button {
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+    button {
+      background: #007bff;
+      color: white;
+      border: none;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+    button:hover {
+      background: #0056b3;
+    }
+    button:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+    .events-log {
+      background: #f8f9fa;
+      border: 1px solid #dee2e6;
+      border-radius: 4px;
+      padding: 15px;
+      max-height: 400px;
+      overflow-y: auto;
+      font-family: monospace;
+      font-size: 12px;
+    }
+    .event-item {
+      padding: 8px;
+      margin-bottom: 8px;
+      border-radius: 4px;
+      background: white;
+      border-left: 4px solid #007bff;
+    }
+    .event-item.ball-event {
+      border-left-color: #28a745;
+    }
+    .event-item.wicket {
+      border-left-color: #dc3545;
+      background: #fff5f5;
+    }
+    .event-item.boundary {
+      border-left-color: #ffc107;
+      background: #fffef5;
+    }
+    .event-item.innings-update {
+      border-left-color: #17a2b8;
+    }
+    .event-item.match-update {
+      border-left-color: #6f42c1;
+    }
+    .event-time {
+      color: #6c757d;
+      font-size: 10px;
+    }
+    .event-type {
+      font-weight: bold;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+    .event-data {
+      margin-top: 4px;
+      color: #495057;
+    }
+    .scorecard {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+      margin-top: 15px;
+    }
+    .score-box {
+      background: #f8f9fa;
+      padding: 15px;
+      border-radius: 4px;
+      border: 2px solid #dee2e6;
+    }
+    .score-label {
+      color: #6c757d;
+      font-size: 12px;
+      margin-bottom: 5px;
+    }
+    .score-value {
+      font-size: 24px;
+      font-weight: bold;
+      color: #333;
+    }
+  </style>
+</head>
+<body>
+  <h1>🏏 BatBliz Real-Time Cricket Scoring</h1>
+  
+  <div class="container">
+    <h2>Connection Status</h2>
+    <div id="status" class="status disconnected">Disconnected</div>
+    
+    <div class="controls">
+      <input type="text" id="serverUrl" placeholder="Server URL" value="http://localhost:3000">
+      <button id="connectBtn" onclick="connect()">Connect</button>
+      <button id="disconnectBtn" onclick="disconnect()" disabled>Disconnect</button>
+    </div>
+  </div>
+
+  <div class="container">
+    <h2>Match Subscription</h2>
+    <div class="controls">
+      <input type="number" id="matchId" placeholder="Match ID" value="1">
+      <button id="joinMatchBtn" onclick="joinMatch()" disabled>Join Match</button>
+      <button id="leaveMatchBtn" onclick="leaveMatch()" disabled>Leave Match</button>
+    </div>
+    <div class="controls">
+      <input type="number" id="inningsId" placeholder="Innings ID" value="1">
+      <button id="joinInningsBtn" onclick="joinInnings()" disabled>Join Innings</button>
+      <button id="leaveInningsBtn" onclick="leaveInnings()" disabled>Leave Innings</button>
+    </div>
+  </div>
+
+  <div class="container">
+    <h2>Live Scorecard</h2>
+    <div class="scorecard">
+      <div class="score-box">
+        <div class="score-label">Runs</div>
+        <div class="score-value" id="runs">0</div>
+      </div>
+      <div class="score-box">
+        <div class="score-label">Wickets</div>
+        <div class="score-value" id="wickets">0</div>
+      </div>
+      <div class="score-box">
+        <div class="score-label">Overs</div>
+        <div class="score-value" id="overs">0.0</div>
+      </div>
+      <div class="score-box">
+        <div class="score-label">Extras</div>
+        <div class="score-value" id="extras">0</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="container">
+    <h2>Real-Time Events</h2>
+    <button onclick="clearEvents()" style="margin-bottom: 10px;">Clear Events</button>
+    <div id="eventsLog" class="events-log">
+      <div style="color: #6c757d; text-align: center;">Waiting for events...</div>
+    </div>
+  </div>
+
+  <script>
+    let socket = null;
+    let currentMatchId = null;
+    let currentInningsId = null;
+
+    function updateStatus(connected) {
+      const statusEl = document.getElementById('status');
+      const connectBtn = document.getElementById('connectBtn');
+      const disconnectBtn = document.getElementById('disconnectBtn');
+      const joinMatchBtn = document.getElementById('joinMatchBtn');
+      const leaveMatchBtn = document.getElementById('leaveMatchBtn');
+      const joinInningsBtn = document.getElementById('joinInningsBtn');
+      const leaveInningsBtn = document.getElementById('leaveInningsBtn');
+
+      if (connected) {
+        statusEl.textContent = 'Connected ✓';
+        statusEl.className = 'status connected';
+        connectBtn.disabled = true;
+        disconnectBtn.disabled = false;
+        joinMatchBtn.disabled = false;
+        joinInningsBtn.disabled = false;
+      } else {
+        statusEl.textContent = 'Disconnected ✗';
+        statusEl.className = 'status disconnected';
+        connectBtn.disabled = false;
+        disconnectBtn.disabled = true;
+        joinMatchBtn.disabled = true;
+        leaveMatchBtn.disabled = true;
+        joinInningsBtn.disabled = true;
+        leaveInningsBtn.disabled = true;
+      }
+    }
+
+    function connect() {
+      const serverUrl = document.getElementById('serverUrl').value;
+      
+      socket = io(serverUrl, {
+        transports: ['websocket', 'polling']
+      });
+
+      socket.on('connect', () => {
+        console.log('Connected to server');
+        updateStatus(true);
+        logEvent('system', 'Connected to server', { socketId: socket.id });
+      });
+
+      socket.on('disconnect', () => {
+        console.log('Disconnected from server');
+        updateStatus(false);
+        logEvent('system', 'Disconnected from server');
+      });
+
+      socket.on('error', (error) => {
+        console.error('Socket error:', error);
+        logEvent('error', 'Socket error', error);
+      });
+
+      // Listen for ball events
+      socket.on('ball-event', (data) => {
+        console.log('Ball event received:', data);
+        logEvent('ball-event', 'Ball Event', data);
+        
+        if (data.type === 'ball-created') {
+          updateScorecard(data.ballEvent);
+        }
+      });
+
+      // Listen for wicket events
+      socket.on('wicket', (data) => {
+        console.log('Wicket event received:', data);
+        logEvent('wicket', 'WICKET!', data);
+      });
+
+      // Listen for boundary events
+      socket.on('boundary', (data) => {
+        console.log('Boundary event received:', data);
+        logEvent('boundary', `${data.runs === 4 ? 'FOUR!' : 'SIX!'}`, data);
+      });
+
+      // Listen for innings updates
+      socket.on('innings-update', (data) => {
+        console.log('Innings update received:', data);
+        logEvent('innings-update', 'Innings Update', data);
+        
+        if (data.innings) {
+          document.getElementById('runs').textContent = data.innings.runs || 0;
+          document.getElementById('wickets').textContent = data.innings.wickets || 0;
+          document.getElementById('overs').textContent = data.innings.overs || '0.0';
+          document.getElementById('extras').textContent = data.innings.extras || 0;
+        }
+      });
+
+      // Listen for match updates
+      socket.on('match-update', (data) => {
+        console.log('Match update received:', data);
+        logEvent('match-update', 'Match Update', data);
+      });
+
+      // Listen for room join confirmations
+      socket.on('joined-match', (data) => {
+        console.log('Joined match:', data);
+        logEvent('system', 'Joined Match', data);
+        document.getElementById('leaveMatchBtn').disabled = false;
+      });
+
+      socket.on('left-match', (data) => {
+        console.log('Left match:', data);
+        logEvent('system', 'Left Match', data);
+        document.getElementById('leaveMatchBtn').disabled = true;
+      });
+
+      socket.on('joined-innings', (data) => {
+        console.log('Joined innings:', data);
+        logEvent('system', 'Joined Innings', data);
+        document.getElementById('leaveInningsBtn').disabled = false;
+      });
+
+      socket.on('left-innings', (data) => {
+        console.log('Left innings:', data);
+        logEvent('system', 'Left Innings', data);
+        document.getElementById('leaveInningsBtn').disabled = true;
+      });
+    }
+
+    function disconnect() {
+      if (socket) {
+        socket.disconnect();
+        socket = null;
+        updateStatus(false);
+      }
+    }
+
+    function joinMatch() {
+      const matchId = document.getElementById('matchId').value;
+      if (socket && matchId) {
+        currentMatchId = matchId;
+        socket.emit('join-match', matchId);
+      }
+    }
+
+    function leaveMatch() {
+      if (socket && currentMatchId) {
+        socket.emit('leave-match', currentMatchId);
+        currentMatchId = null;
+      }
+    }
+
+    function joinInnings() {
+      const inningsId = document.getElementById('inningsId').value;
+      if (socket && inningsId) {
+        currentInningsId = inningsId;
+        socket.emit('join-innings', inningsId);
+      }
+    }
+
+    function leaveInnings() {
+      if (socket && currentInningsId) {
+        socket.emit('leave-innings', currentInningsId);
+        currentInningsId = null;
+      }
+    }
+
+    function logEvent(type, title, data) {
+      const eventsLog = document.getElementById('eventsLog');
+      const eventItem = document.createElement('div');
+      eventItem.className = `event-item ${type}`;
+      
+      const now = new Date().toLocaleTimeString();
+      
+      eventItem.innerHTML = `
+        <div class="event-type">${title}</div>
+        <div class="event-time">${now}</div>
+        <div class="event-data">${JSON.stringify(data, null, 2)}</div>
+      `;
+      
+      // Remove "waiting for events" message if it exists
+      const waiting = eventsLog.querySelector('[style*="color: #6c757d"]');
+      if (waiting) {
+        waiting.remove();
+      }
+      
+      eventsLog.insertBefore(eventItem, eventsLog.firstChild);
+      
+      // Keep only last 50 events
+      while (eventsLog.children.length > 50) {
+        eventsLog.removeChild(eventsLog.lastChild);
+      }
+    }
+
+    function updateScorecard(ballEvent) {
+      // This would be updated from innings-update events primarily
+      // But we can also infer from ball events
+    }
+
+    function clearEvents() {
+      const eventsLog = document.getElementById('eventsLog');
+      eventsLog.innerHTML = '<div style="color: #6c757d; text-align: center;">Events cleared...</div>';
+    }
+
+    // Initialize
+    updateStatus(false);
+  </script>
+</body>
+</html>
+

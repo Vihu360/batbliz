@@ -75,6 +75,12 @@ const MODELS: Record<string, ModelConfig> = {
     searchFields: [],
     defaultSort: { field: "inningNumber", order: "asc" },
   },
+  "match-squad": {
+    name: "MatchSquad",
+    prismaModel: prisma.matchSquad,
+    searchFields: ["playerId", "teamId", "matchId"],
+    defaultSort: { field: "id", order: "desc" },
+  },
   ball_events: {
     name: "ball_events",
     prismaModel: prisma.ballEvent,
@@ -263,6 +269,62 @@ function parseSortParams(query: any, defaultSort?: { field: string; order: "asc"
 
   return { [sortField]: sortOrder };
 }
+
+// ============================================
+// UTILITY ENDPOINTS (must be before /:model routes)
+// ============================================
+
+/**
+ * GET /meta - List all available models
+ */
+router.get("/meta", async (req: Request, res: Response) => {
+  const modelsList = Object.entries(MODELS).map(([key, model]) => ({
+    key,
+    name: model.name,
+    searchFields: model.searchFields,
+    defaultSort: model.defaultSort,
+  }));
+
+  res.json({
+    success: true,
+    data: modelsList,
+    enums: ENUMS,
+  });
+});
+
+/**
+ * GET /enums - Get all enum values
+ */
+router.get("/enums", async (req: Request, res: Response) => {
+  res.json({
+    success: true,
+    data: ENUMS,
+  });
+});
+
+/**
+ * GET /enums/:enumName - Get specific enum values
+ */
+router.get("/enums/:enumName", async (req: Request, res: Response) => {
+  const { enumName } = req.params;
+  const enumValues = ENUMS[enumName as keyof typeof ENUMS];
+
+  if (!enumValues) {
+    return res.status(404).json({
+      success: false,
+      error: `Enum '${enumName}' not found`,
+      availableEnums: Object.keys(ENUMS),
+    });
+  }
+
+  res.json({
+    success: true,
+    data: {
+      name: enumName,
+      values: enumValues,
+    },
+  });
+});
 
 // ============================================
 // CRUD ENDPOINTS
@@ -610,7 +672,7 @@ router.patch("/:model/:id", async (req: Request, res: Response) => {
       success: false,
       error: "Failed to update record",
       details: error instanceof Error ? error.message : "Unknown error",
-    });
+    }); 
   }
 });
 
@@ -654,9 +716,45 @@ router.delete("/:model/:id", async (req: Request, res: Response) => {
       });
     }
 
-    await modelConfig.prismaModel.delete({
-      where: { id: recordId },
-    });
+    // Special handling for models with dependent records (foreign key constraints)
+    if (model === "player") {
+      await prisma.$transaction(async (tx) => {
+        // Remove all dependent records first
+        await tx.playerTeam.deleteMany({ where: { playerId: recordId } });
+        await tx.playerContract.deleteMany({ where: { playerId: recordId } });
+        await tx.matchSquad.deleteMany({ where: { playerId: recordId } });
+        await tx.playerMatchStat.deleteMany({ where: { playerId: recordId } });
+        await tx.match.updateMany({ where: { playerOfMatchId: recordId }, data: { playerOfMatchId: null } });
+
+        // BallEvent has multiple FKs referencing player
+        await tx.ballEvent.deleteMany({ where: { batsmanId: recordId } });
+        await tx.ballEvent.deleteMany({ where: { bowlerId: recordId } });
+        await tx.ballEvent.deleteMany({ where: { nonStrikerId: recordId } });
+        await tx.ballEvent.deleteMany({ where: { dismissedPlayerId: recordId } });
+        await tx.ballEvent.deleteMany({ where: { fielderId: recordId } });
+
+        // Now delete the player
+        await tx.player.delete({ where: { id: recordId } });
+      });
+    } else if (model === "team") {
+      await prisma.$transaction(async (tx) => {
+        await tx.playerTeam.deleteMany({ where: { teamId: recordId } });
+        await tx.playerContract.deleteMany({ where: { teamId: recordId } });
+        await tx.matchSquad.deleteMany({ where: { teamId: recordId } });
+        await tx.teamMatchStat.deleteMany({ where: { teamId: recordId } });
+        await tx.inning.deleteMany({ where: { battingTeamId: recordId } });
+        await tx.inning.deleteMany({ where: { bowlingTeamId: recordId } });
+        await tx.match.updateMany({ where: { teamAId: recordId }, data: { teamAId: 0 } });
+        await tx.match.updateMany({ where: { teamBId: recordId }, data: { teamBId: 0 } });
+        await tx.match.updateMany({ where: { tossWinnerId: recordId }, data: { tossWinnerId: null } });
+        await tx.match.updateMany({ where: { winnerTeamId: recordId }, data: { winnerTeamId: null } });
+        await tx.team.delete({ where: { id: recordId } });
+      });
+    } else {
+      await modelConfig.prismaModel.delete({
+        where: { id: recordId },
+      });
+    }
 
     res.json({
       success: true,
@@ -748,18 +846,51 @@ router.delete("/:model/bulk", async (req: Request, res: Response) => {
       });
     }
 
-    const result = await modelConfig.prismaModel.deleteMany({
-      where: {
-        id: {
-          in: req.body.ids,
+    const ids = req.body.ids as number[];
+
+    // Special handling for models with dependent records
+    if (model === "player") {
+      await prisma.$transaction(async (tx) => {
+        await tx.playerTeam.deleteMany({ where: { playerId: { in: ids } } });
+        await tx.playerContract.deleteMany({ where: { playerId: { in: ids } } });
+        await tx.matchSquad.deleteMany({ where: { playerId: { in: ids } } });
+        await tx.playerMatchStat.deleteMany({ where: { playerId: { in: ids } } });
+        await tx.match.updateMany({ where: { playerOfMatchId: { in: ids } }, data: { playerOfMatchId: null } });
+        await tx.ballEvent.deleteMany({ where: { batsmanId: { in: ids } } });
+        await tx.ballEvent.deleteMany({ where: { bowlerId: { in: ids } } });
+        await tx.ballEvent.deleteMany({ where: { nonStrikerId: { in: ids } } });
+        await tx.ballEvent.deleteMany({ where: { dismissedPlayerId: { in: ids } } });
+        await tx.ballEvent.deleteMany({ where: { fielderId: { in: ids } } });
+        await tx.player.deleteMany({ where: { id: { in: ids } } });
+      });
+    } else if (model === "team") {
+      await prisma.$transaction(async (tx) => {
+        await tx.playerTeam.deleteMany({ where: { teamId: { in: ids } } });
+        await tx.playerContract.deleteMany({ where: { teamId: { in: ids } } });
+        await tx.matchSquad.deleteMany({ where: { teamId: { in: ids } } });
+        await tx.teamMatchStat.deleteMany({ where: { teamId: { in: ids } } });
+        await tx.inning.deleteMany({ where: { battingTeamId: { in: ids } } });
+        await tx.inning.deleteMany({ where: { bowlingTeamId: { in: ids } } });
+        await tx.match.updateMany({ where: { teamAId: { in: ids } }, data: { teamAId: 0 } });
+        await tx.match.updateMany({ where: { teamBId: { in: ids } }, data: { teamBId: 0 } });
+        await tx.match.updateMany({ where: { tossWinnerId: { in: ids } }, data: { tossWinnerId: null } });
+        await tx.match.updateMany({ where: { winnerTeamId: { in: ids } }, data: { winnerTeamId: null } });
+        await tx.team.deleteMany({ where: { id: { in: ids } } });
+      });
+    } else {
+      await modelConfig.prismaModel.deleteMany({
+        where: {
+          id: {
+            in: ids,
+          },
         },
-      },
-    });
+      });
+    }
 
     res.json({
       success: true,
-      message: `${result.count} ${modelConfig.name}(s) deleted successfully`,
-      count: result.count,
+      message: `${ids.length} ${modelConfig.name}(s) deleted successfully`,
+      count: ids.length,
     });
   } catch (error) {
     console.error(`Error bulk deleting ${req.params.model}:`, error);
@@ -769,58 +900,6 @@ router.delete("/:model/bulk", async (req: Request, res: Response) => {
       details: error instanceof Error ? error.message : "Unknown error",
     });
   }
-});
-
-// ============================================
-// UTILITY ENDPOINTS
-// ============================================
-
-/**
- * GET /models - List all available models
- */
-router.get("/meta", async (req: Request, res: Response) => {
-  const modelsList = Object.entries(MODELS).map(([key, model]) => ({
-    key,
-    name: model.name,
-    searchFields: model.searchFields,
-    defaultSort: model.defaultSort,
-  }));
-
-  res.json({
-    success: true,
-    data: modelsList,
-    enums: ENUMS,
-  });
-});
-
-/*** GET /enums - Get all enum values*/
-router.get("/enums", async (req: Request, res: Response) => {
-  res.json({
-    success: true,
-    data: ENUMS,
-  });
-});
-
-/*** GET /enums/:enumName - Get specific enum values*/
-router.get("/enums/:enumName", async (req: Request, res: Response) => {
-  const { enumName } = req.params;
-  const enumValues = ENUMS[enumName as keyof typeof ENUMS];
-
-  if (!enumValues) {
-    return res.status(404).json({
-      success: false,
-      error: `Enum '${enumName}' not found`,
-      availableEnums: Object.keys(ENUMS),
-    });
-  }
-
-  res.json({
-    success: true,
-    data: {
-      name: enumName,
-      values: enumValues,
-    },
-  });
 });
 
 export default router;

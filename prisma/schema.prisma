@@ -65,6 +65,26 @@ enum SquadRole {
   SUBSTITUTE
 }
 
+enum UserRole {
+  ADMIN
+  EDITOR
+  VIEWER
+}
+
+
+// --- Auth
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  password  String
+  name      String
+  role      UserRole @default(ADMIN)
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("users")
+}
 
 // --- Core domain
 model Competition {
@@ -136,6 +156,7 @@ model Team {
 
   // Relations
   homeVenue         Venue?           @relation(fields: [homeVenueId], references: [id])
+  playerTeams       PlayerTeam[]
   playerContracts   PlayerContract[]
   matchesAsTeamA    Match[]          @relation("TeamA")
   matchesAsTeamB    Match[]          @relation("TeamB")
@@ -167,7 +188,8 @@ model Player {
   updatedAt     DateTime @updatedAt @map("updated_at")
 
   // Relations
-  playerContracts     PlayerContract[]
+  playerTeams            PlayerTeam[]
+  playerContracts        PlayerContract[]
   matchesAsPlayerOfMatch Match[]       @relation("PlayerOfMatch")
   ballEventsAsBatsman    BallEvent[]   @relation("Batsman")
   ballEventsAsBowler      BallEvent[]   @relation("Bowler")
@@ -178,6 +200,27 @@ model Player {
   matchSquads            MatchSquad[]
 
   @@map("players")
+}
+
+model PlayerTeam {
+  id        Int      @id @default(autoincrement())
+  playerId  Int      @map("player_id")
+  teamId    Int      @map("team_id")
+  teamType  TeamType @map("team_type") // Denormalized from Team.type to enforce unique constraint
+  startDate DateTime @default(now()) @map("start_date") @db.Date
+  endDate   DateTime? @map("end_date") @db.Date
+  isActive  Boolean  @default(true) @map("is_active")
+  role      String?  // Captain, Vice-Captain, etc.
+  metadata  Json?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  player Player @relation(fields: [playerId], references: [id])
+  team   Team   @relation(fields: [teamId], references: [id])
+
+  @@unique([playerId, teamType]) // One team per type per player
+  @@map("player_teams")
 }
 
 model PlayerContract {
@@ -207,6 +250,8 @@ model MatchSquad {
   matchId   Int
   playerId  Int
   teamId    Int
+  position  Int?
+  
   role      SquadRole  @default(SELECTED)
 
   match    Match  @relation(fields: [matchId], references: [id])
@@ -266,7 +311,7 @@ model Inning {
   bowlingTeamId     Int   @map("bowling_team_id")
   runs              Int      @default(0)
   wickets           Int      @default(0)
-  overs             Decimal  @db.Decimal(5, 1) @default(0)
+  ballsBowled       Int      @default(0)
   extras            Int      @default(0)
   declared          Boolean  @default(false)
   allOut            Boolean  @default(false) @map("all_out")
@@ -302,7 +347,9 @@ model BallEvent {
   dismissedPlayerId    Int?  @map("dismissed_player_id")
   fielderId            Int?  @map("fielder_id")
   commentaryText       String?  @map("commentary_text") @db.Text
-  ballTimestamp        DateTime @map("ball_timestamp")
+  isLegalDelivery      Boolean @default(true)
+  deliveryIndex        Int    @default(0)
+  ballTimestamp DateTime @default(now()) @map("ball_timestamp")
   metadata             Json?    // wagon wheel, shot_type, pitch coords, video refs
   createdAt            DateTime @default(now()) @map("created_at")
   updatedAt            DateTime @updatedAt @map("updated_at")
@@ -316,7 +363,13 @@ model BallEvent {
   dismissedPlayer   Player? @relation("DismissedPlayer", fields: [dismissedPlayerId], references: [id])
   fielder           Player? @relation("Fielder", fields: [fielderId], references: [id])
 
+  @@index([matchId, inningsId])
+  @@index([inningsId, overNumber])
+  @@index([bowlerId])
+  @@index([batsmanId])
   @@map("ball_events")
+
+  @@unique([inningsId, overNumber, ballInOver, deliveryIndex])
 }
 
 model PlayerMatchStat {
