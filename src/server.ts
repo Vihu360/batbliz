@@ -26,7 +26,7 @@ const PORT = process.env.PORT ? Number(process.env.PORT) : 3000;
 // Initialize Socket.IO with CORS configuration
 const io = new Server(httpServer, {
   cors: {
-    origin: ["http://localhost:3000", "https://batbliz-admin.vercel.app", "http://localhost:3002"],
+    origin: ["http://localhost:3000", "https://admin.cricvot.com/", "https://admin.cricvot.com" "https://batbliz-admin.vercel.app", "http://localhost:3002"],
     credentials: true,
     methods: ["GET", "POST"]
   }
