@@ -39,7 +39,7 @@ app.use(cookieParser());
 app.use(express.json());
 
 app.use(cors({
-  origin: ["http://localhost:3000", "https://batbliz-admin.vercel.app", "http://localhost:3002", "http://localhost:3002/"],
+  origin: ["http://localhost:3000", "https://admin.cricvot.com", "https://batbliz-admin.vercel.app", "http://localhost:3002", "http://localhost:3002/"],
   credentials: true
 }));
 
